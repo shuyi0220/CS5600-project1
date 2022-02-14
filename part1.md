@@ -27,6 +27,7 @@ user@linux:proj1$ valgrind ./part-1
 ==12338== Command: ./part-1
 ==12338==
 Hello, type lines of input, or 'quit':
+```
 > this is a test
 you typed: this is a test
 > quit
@@ -41,6 +42,7 @@ you typed: this is a test
 ==12338== For lists of detected and suppressed errors, rerun with: -s
 ==12338== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
 user@linux:proj1$
+```
 
 ##Submission
 Your submission for this part will be the contents of “part-1.c” and any code you wrote for testing if it is in a different file. Include a README.txt file in the submission folder to indicate which files you have modified/created to finish part 1.
