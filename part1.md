@@ -18,7 +18,7 @@ GDB for your debugging (and no strcmp for string comparisons, or malloc for allo
 ## Compiling
 You can compile part 1 with the command make part-1. You can “clean up” (i.e. delete the compiled executables and intermediate files) with the command make clean.
 
-##Testing
+## Testing
 You won’t need to do a lot of testing for this one - it either works or it doesn’t. Before you submit your work I would suggest you run it under valgrind, which will tell you if you’re reading or writing memory that you didn’t intend to:
 user@linux:proj1$ valgrind ./part-1
 ==12338== Memcheck, a memory error detector
@@ -44,5 +44,5 @@ you typed: this is a test
 user@linux:proj1$
 ```
 
-##Submission
+## Submission
 Your submission for this part will be the contents of “part-1.c” and any code you wrote for testing if it is in a different file. Include a README.txt file in the submission folder to indicate which files you have modified/created to finish part 1.
