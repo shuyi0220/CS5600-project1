@@ -35,6 +35,7 @@ void do_readline(char *buf, int len);
 void do_print(char *buf);
 char *do_getarg(int i);
 
+
 /* ---------- */
 
 /* the guts of part 2
@@ -63,28 +64,11 @@ char *do_getarg(int i);
  #define FUNCTION_SUCCESS 0
  #define FUNCTION_FAILURE -1
 
+/* Global  variables for do_getarg */
+char *argv[10];
+char *pInput;
+
 /* your code here */
-int do_readline(char *pInput)
-{
-    int ret = FUNCTION_FAILURE;
-    if (pInput != NULL) {
-        // Read input character one at a time until EOF and newline character is found with NULL termination.
-        ret = read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
-    }
-    return ret;
-}
-
-int do_print(void *pInput)
-{
-    int ret = FUNCTION_FAILURE;
-    if (pInput != NULL) {
-        // Read input characters until EOF and newline character is found.
-        ret = write(STDOUT_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
-    }
-    return ret;
-}
-
-
 int read(int fd, void *ptr, int len)
 {
 	int ret = FUNCTION_FAILURE;
@@ -137,18 +121,47 @@ void exit(int err)
 
 int open(char *path, int flags){
 
+
+	return syscall(__NR_open, path, flags);
+
+
 }
 int close(int fd){
 
+	return syscall(__NR_close,fd);
+
 }
 int lseek(int fd, int offset, int flag){
-
+	return syscall(__NR_lseek,fd,offset,flag);
 }
+
 void *mmap(void *addr, int len, int prot, int flags, int fd, int offset){
+	return syscall(__NR_mmap,addr,len,prot,flags,fd,offset);
+}
+
+int munmap(void *addr, int len){
+	return syscall(__NR_munmap,addr,len);
+}
+
+char *do_getarg(int i){
+	int argc = split(argv,10,pInput);
+	if(i >= argc){
+		return 0;
+	}
+	return argv[i];
+}
+
+void do_readline(char *buf, int len){
 
 }
-int munmap(void *addr, int len){
 
+void do_print(char *buf){
+	int ret = FUNCTION_FAILURE;
+	if (buf != NULL) {
+			// Read input characters until EOF and newline character is found.
+			ret = write(STDOUT_FILE_DESCRIPTOR_NUMBER, buf, MAX_BUFFER_SIZE);
+	}
+	return ret;
 }
 /* ---------- */
 
@@ -176,6 +189,64 @@ int split(char **argv, int max_argc, char *line)
 	return i;
 }
 
+void Load_Execute_Program(*wait){
+  pInput = &wait[0];
+  char *filename = do_getarg(0);	/* I should really check argc first... */
+  int fd;
+  fd = open(filename, O_RDONLY) < 0)
+  // fd point to executable file now
+
+  /* read the main header (offset 0) */
+  struct elf64_ehdr hdr;
+  read(fd, &hdr, sizeof(hdr));
+
+
+  /* read program headers (offset 'hdr.e_phoff') */
+  int i, n = hdr.e_phnum;
+  struct elf64_phdr phdrs[n];
+  lseek(fd, hdr.e_phoff, SEEK_SET);
+  read(fd, phdrs, sizeof(phdrs));
+  char *buf;
+  int M_offset = 40;
+  int len[hdr.e_phnum];
+
+  /* look at each section in program headers */
+  for (i = 0; i < hdr.e_phnum; i++) {
+    if (phdrs[i].p_type == PT_LOAD) {
+      len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
+        long addrp = ROUND_DOWN((long) phdrs[i].p_vaddr, 4096);
+        int addr = addrp + M_offset;
+        *(buf+i) = mmap(addr, len, PROT_READ | PROT_WRITE |
+                         PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+        lseek(fd, phdrs[i].p_offset, SEEK_SET);
+        read(fd,addr,phdrs[i].p_filesz);
+    }
+
+
+}
+do_print("Defining void function");
+void(*func)();
+func = hdr.e_entry + M_offset;
+func(); //call the first instruction to execute
+do_print("func called\n");
+
+// free the memory allocate from mmap
+for (i = 0; i < hdr.e_phnum; i++) {
+if (phdrs[i].p_type == PT_LOAD) {
+  len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
+  do_print("FREEING MEMORY\n");
+    long addrp = ROUND_DOWN((long) phdrs[i].p_vaddr, 4096);
+    munmap(*(buf+i), len[i]);
+
+
+
+}
+do_print("Memory is now Free, closing fd");
+close(fd);
+}
+}
+
 /* ---------- */
 
 void main(void)
@@ -185,16 +256,20 @@ void main(void)
 	vector[2] = do_getarg;
 
 	/* YOUR CODE HERE */
-	char input[MAX_BUFFER_SIZE] = {0};
-	char *pInput = &input[0];
+  Load_Execute_Program("wait");
+  char input[MAX_BUFFER_SIZE] = {0};
+  pInput = &input[0];
 	char quit[5] = {'q', 'u', 'i', 't', '\n'};
 	char *pQuit = &quit[0];
 	int exit_code = EXIT_FAILURE;
 
-	if(pInput != NULL) {    // NULL check, if in case malloc is used in future
+
+  if(pInput != NULL) {    // NULL check, if in case malloc is used in future
+
 			while(1) {
-					print("> ");
-					// readline(pInput);
+        do_print("> ");
+        // readline(pInput);
+
 					read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
 					int count = 0;
 					int match = 1;
@@ -211,21 +286,72 @@ void main(void)
 							exit_code = EXIT_SUCCESS;
 							break;
 					}
-					char *argv[10];
-				  int argc = split(argv, 10, &input);
-					char *filename = argv[1];	/* I should really check argc first... */
+					char *filename = do_getarg(0);	/* I should really check argc first... */
 					int fd;
-					if ((fd = open(filename, O_RDONLY)) < 0)
-						return 1;		/* failure code */
+					if(fd = open(filename, O_RDONLY) < 0){
+						exit_code = ERROR_NULL_POINTER;
+						exit(exit_code);
+					}
+					// fd point to executable file now
 
-					//print("you typed: ");
-					// print(pInput);
-					//write(STDOUT_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
+					/* read the main header (offset 0) */
+					struct elf64_ehdr hdr;
+					read(fd, &hdr, sizeof(hdr));
+
+					/* read program headers (offset 'hdr.e_phoff') */
+					int i, n = hdr.e_phnum;
+					struct elf64_phdr phdrs[n];
+					lseek(fd, hdr.e_phoff, SEEK_SET);
+					read(fd, phdrs, sizeof(phdrs));
+          void *buf;
+          int M_offset = 40;
+          int len[hdr.e_phnum];
+
+					/* look at each section in program headers */
+					for (i = 0; i < hdr.e_phnum; i++) {
+						if (phdrs[i].p_type == PT_LOAD) {
+							len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
+
+                long addrp = ROUND_DOWN((long) phdrs[i].p_vaddr, 4096);
+                int addr = addrp + M_offset;
+                *(buf+i) = mmap(addr, len, PROT_READ | PROT_WRITE |
+                                 PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+                if (*(buf+i) == MAP_FAILED) {
+                    do_print(“mmap failed"); /* your "print" function */
+                    exit(1);                /* your "exit" function */
+                }
+
+
+
+                lseek(fd, phdrs[i].p_offset, SEEK_SET);
+                read(fd,addr, phdrs[i].p_filesz);
+						}
+
+
 			}
-	}
-	else {
-			exit_code = ERROR_NULL_POINTER;
-	}
+      do_print("Defining void function");
+      void(*func)();
+      func = hdr.e_entry + M_offset;
+      func(); //call the first instruction to execute
+      do_print("func called");
 
-	exit(exit_code);
+      // free the memory allocate from mmap
+      for (i = 0; i < hdr.e_phnum; i++) {
+        if (phdrs[i].p_type == PT_LOAD) {
+          len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
+          do_print("FREEING MEMORY");
+            munmap(*(buf+1), len[i]);
+        }
+        do_print("Memory is now Free, closing fd");
+        close(fd);
+
+
+  }
+	}
+  }
+  else {
+      exit_code = ERROR_NULL_POINTER;
+  }
+
+  exit(exit_code);
 }
