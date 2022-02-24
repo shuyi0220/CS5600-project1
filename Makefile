@@ -26,13 +26,13 @@ CFLAGS = -Wall -ggdb3 -ffreestanding -fno-stack-protector -fstack-check=no -nost
 # Main C programs - compile
 #
 part-1.o: part-1.c
-	gcc $(CFLAGS) -c part-1.c -o part-1.o 
+	gcc $(CFLAGS) -c part-1.c -o part-1.o
 
 part-2.o: part-2.c
-	gcc $(CFLAGS) -c part-2.c -o part-2.o 
+	gcc $(CFLAGS) -c part-2.c -o part-2.o
 
 part-3.o: part-3.c
-	gcc $(CFLAGS) -c part-3.c -o part-3.o 
+	gcc $(CFLAGS) -c part-3.c -o part-3.o
 
 # Main C programs - link
 #
@@ -72,4 +72,3 @@ process2: process2.c call-vector.S
 #
 clean:
 	rm -f *.o part-1 part-2 part-3 wait hello ugrep process1 process2
-
