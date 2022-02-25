@@ -205,12 +205,13 @@ void Load_Execute_Program(char *wait){
   if(pInput != NULL) {    // NULL check, if in case malloc is used in future
 
 			while(1) {
-        do_print("> ");
+
         // readline(pInput);
         if(check){
           check = 0;
         }
         else if(!check){
+          do_print("> ");
           pInput = &input[0];
           read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
 					int count = 0;
@@ -299,9 +300,9 @@ void Load_Execute_Program(char *wait){
 
 void main(void)
 {
-	//vector[0] = do_readline;
-	//vector[1] = do_print;
-	//vector[2] = do_getarg;
+	vector[0] = do_readline;
+	vector[1] = do_print;
+	vector[2] = do_getarg;
 
 	/* YOUR CODE HERE */
   Load_Execute_Program("wait");
