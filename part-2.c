@@ -145,12 +145,13 @@ int munmap(void *addr, int len){
 
 
 void do_readline(char *buf, int len){
-  int ret = FUNCTION_FAILURE;
+  //int ret = FUNCTION_FAILURE;
   if (buf != NULL) {
       // Read input character one at a time until EOF and newline character is found with NULL termination.
-      ret = read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
+      //ret = read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
+      read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
   }
-  return ret;
+  //return ret;
 }
 
 void do_print(char *buf){
@@ -195,85 +196,23 @@ char *do_getarg(int i){
 }
 void Load_Execute_Program(char *wait){
   pInput = &wait[0];
-  char *filename = do_getarg(0);	/* I should really check argc first... */
-  int fd;
-  fd = open(filename, O_RDONLY);
-  // fd point to executable file now
-
-  /* read the main header (offset 0) */
-  struct elf64_ehdr hdr;
-  read(fd, &hdr, sizeof(hdr));
-
-
-  /* read program headers (offset 'hdr.e_phoff') */
-  int i, n = hdr.e_phnum;
-  struct elf64_phdr phdrs[n];
-  lseek(fd, hdr.e_phoff, SEEK_SET);
-  read(fd, phdrs, sizeof(phdrs));
-  char *buf[hdr.e_phnum];
-  int M_offset = 40;
-  int len[hdr.e_phnum];
-
-  /* look at each section in program headers */
-  for (i = 0; i < hdr.e_phnum; i++) {
-    if (phdrs[i].p_type == PT_LOAD) {
-      len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
-        long addrp = ROUND_DOWN((long) phdrs[i].p_vaddr, 4096);
-
-        buf[i] = mmap((void*)(addrp + M_offset), len[i], PROT_READ | PROT_WRITE |
-                         PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-        lseek(fd, phdrs[i].p_offset, SEEK_SET);
-        read(fd,phdrs[i].p_vaddr+M_offset,phdrs[i].p_filesz);
-    }
-
-
-}
-do_print("Defining void function\n");
-void(*func)();
-func = hdr.e_entry + M_offset;
-func(); //call the first instruction to execute
-do_print("func called\n");
-
-// free the memory allocate from mmap
-for (i = 0; i < hdr.e_phnum; i++) {
-if (phdrs[i].p_type == PT_LOAD) {
-  len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
-  do_print("FREEING MEMORY\n");
-    munmap(*(buf+i), len[i]);
-
-
-
-}
-do_print("Memory is now Free, closing fd\n");
-close(fd);
-}
-}
-
-/* ---------- */
-
-void main(void)
-{
-	vector[0] = do_readline;
-	vector[1] = do_print;
-	vector[2] = do_getarg;
-
-	/* YOUR CODE HERE */
-  Load_Execute_Program("wait");
   char input[MAX_BUFFER_SIZE] = {0};
-  pInput = &input[0];
 	char quit[5] = {'q', 'u', 'i', 't', '\n'};
 	char *pQuit = &quit[0];
 	int exit_code = EXIT_FAILURE;
-
+  int check = 1; // checks used to switch from wait input to user input
 
   if(pInput != NULL) {    // NULL check, if in case malloc is used in future
 
 			while(1) {
         do_print("> ");
         // readline(pInput);
-
-					read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
+        if(check){
+          check = 0;
+        }
+        else if(!check){
+          pInput = &input[0];
+          read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
 					int count = 0;
 					int match = 1;
 
@@ -289,6 +228,8 @@ void main(void)
 							exit_code = EXIT_SUCCESS;
 							break;
 					}
+        }
+
 					char *filename = do_getarg(0);	/* I should really check argc first... */
 					int fd = open(filename, O_RDONLY);
 					if( fd < 0){
@@ -307,7 +248,7 @@ void main(void)
 					lseek(fd, hdr.e_phoff, SEEK_SET);
 					read(fd, phdrs, sizeof(phdrs));
           char *buf[hdr.e_phnum];
-          int M_offset = 40;
+          int M_offset = 128*4096;
           int len[hdr.e_phnum];
 
 					/* look at each section in program headers */
@@ -328,10 +269,11 @@ void main(void)
 						}
 			}
       do_print("Defining void function\n");
-      void(*func)();
-      func = hdr.e_entry + M_offset;
-      func(); //call the first instruction to execute
-      do_print("func called\n");
+      void (*f)();
+      f = hdr.e_entry + M_offset;
+      do_print("error here at f\n");
+      f(); //call the first instruction to execute
+      do_print("f called\n");
 
       // free the memory allocate from mmap
       for (i = 0; i < hdr.e_phnum; i++) {
@@ -342,9 +284,6 @@ void main(void)
         }
         do_print("Memory is now Free, closing fd\n");
         close(fd);
-
-
-
   }
 	}
   }
@@ -353,4 +292,18 @@ void main(void)
   }
 
   exit(exit_code);
+
+}
+
+/* ---------- */
+
+void main(void)
+{
+	//vector[0] = do_readline;
+	//vector[1] = do_print;
+	//vector[2] = do_getarg;
+
+	/* YOUR CODE HERE */
+  Load_Execute_Program("wait");
+
 }
