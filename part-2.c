@@ -194,7 +194,67 @@ char *do_getarg(int i){
 	}
 	return argv[i];
 }
-void Load_Execute_Program(char *wait){
+void Load_Execute_Program(){
+  int exit_code = EXIT_FAILURE;
+  char *filename = do_getarg(0);	/* I should really check argc first... */
+  do_print(filename);
+  int fd = open(filename, O_RDONLY);
+  if( fd < 0){
+    exit_code = ERROR_NULL_POINTER;
+    exit(exit_code);
+  }
+  // fd point to executable file now
+
+  /* read the main header (offset 0) */
+  struct elf64_ehdr hdr;
+  read(fd, &hdr, sizeof(hdr));
+
+  /* read program headers (offset 'hdr.e_phoff') */
+  int i, n = hdr.e_phnum;
+  struct elf64_phdr phdrs[n];
+  lseek(fd, hdr.e_phoff, SEEK_SET);
+  read(fd, phdrs, sizeof(phdrs));
+  char *buf[n];
+  int M_offset = 128*4096;
+  int len[n];
+
+  /* look at each section in program headers */
+  for (i = 0; i < n; i++) {
+    if (phdrs[i].p_type == PT_LOAD) {
+      len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
+
+        long addrp = ROUND_DOWN((long) phdrs[i].p_vaddr, 4096);
+        long addr = addrp + M_offset;
+        buf[i] = mmap((void*)addr, len[i], PROT_READ | PROT_WRITE |
+                         PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (buf[i] == MAP_FAILED) {
+            exit(EXIT_FAILURE);
+        }
+
+        lseek(fd, phdrs[i].p_offset, SEEK_SET);
+        read(fd,addr, phdrs[i].p_filesz);
+    }
+}
+do_print("Defining void function\n");
+void (*f)();
+f = hdr.e_entry + M_offset;
+do_print("error here at line 275\n");
+f(); //call the first instruction to execute
+do_print("f called\n");
+
+// free the memory allocate from mmap
+for (i = 0; i < hdr.e_phnum; i++) {
+if (phdrs[i].p_type == PT_LOAD) {
+  len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
+  do_print("FREEING MEMORY\n");
+    munmap(buf[i], len[i]);
+}
+
+}
+do_print("Memory is now Free, closing fd\n");
+close(fd);
+}
+void Enter_File_Name(char *wait){
   pInput = &wait[0];
   char input[MAX_BUFFER_SIZE] = {0};
 	char quit[5] = {'q', 'u', 'i', 't', '\n'};
@@ -213,7 +273,7 @@ void Load_Execute_Program(char *wait){
         else if(!check){
           do_print("> ");
           pInput = &input[0];
-          read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
+          do_readline(pInput,0);
 					int count = 0;
 					int match = 1;
 
@@ -230,62 +290,7 @@ void Load_Execute_Program(char *wait){
 							break;
 					}
         }
-
-					char *filename = do_getarg(0);	/* I should really check argc first... */
-					int fd = open(filename, O_RDONLY);
-					if( fd < 0){
-						exit_code = ERROR_NULL_POINTER;
-						exit(exit_code);
-					}
-					// fd point to executable file now
-
-					/* read the main header (offset 0) */
-					struct elf64_ehdr hdr;
-					read(fd, &hdr, sizeof(hdr));
-
-					/* read program headers (offset 'hdr.e_phoff') */
-					int i, n = hdr.e_phnum;
-					struct elf64_phdr phdrs[n];
-					lseek(fd, hdr.e_phoff, SEEK_SET);
-					read(fd, phdrs, sizeof(phdrs));
-          char *buf[hdr.e_phnum];
-          int M_offset = 128*4096;
-          int len[hdr.e_phnum];
-
-					/* look at each section in program headers */
-					for (i = 0; i < hdr.e_phnum; i++) {
-						if (phdrs[i].p_type == PT_LOAD) {
-							len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
-
-                long addrp = ROUND_DOWN((long) phdrs[i].p_vaddr, 4096);
-
-                buf[i] = mmap((void*)(addrp + M_offset), len[i], PROT_READ | PROT_WRITE |
-                                 PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-                if (buf[i] == MAP_FAILED) {
-                    exit(EXIT_FAILURE);
-                }
-
-                lseek(fd, phdrs[i].p_offset, SEEK_SET);
-                read(fd,phdrs[i].p_vaddr+M_offset, sizeof(phdrs[i].p_filesz));
-						}
-			}
-      do_print("Defining void function\n");
-      void (*f)();
-      f = hdr.e_entry + M_offset;
-      do_print("error here at line 275\n");
-      f(); //call the first instruction to execute
-      do_print("f called\n");
-
-      // free the memory allocate from mmap
-      for (i = 0; i < hdr.e_phnum; i++) {
-        if (phdrs[i].p_type == PT_LOAD) {
-          len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
-          do_print("FREEING MEMORY\n");
-            munmap(buf[i], len[i]);
-        }
-        do_print("Memory is now Free, closing fd\n");
-        close(fd);
-  }
+        Load_Execute_Program();
 	}
   }
   else {
@@ -305,6 +310,6 @@ void main(void)
 	vector[2] = do_getarg;
 
 	/* YOUR CODE HERE */
-  Load_Execute_Program("wait");
+  Enter_File_Name("wait");
 
 }
