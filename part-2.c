@@ -271,7 +271,7 @@ void Load_Execute_Program(char *wait){
       do_print("Defining void function\n");
       void (*f)();
       f = hdr.e_entry + M_offset;
-      do_print("error here at f\n");
+      do_print("error here at line 275\n");
       f(); //call the first instruction to execute
       do_print("f called\n");
 
