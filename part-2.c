@@ -65,53 +65,23 @@ char *do_getarg(int i);
  #define FUNCTION_FAILURE -1
 
 /* Global  variables for do_getarg */
-char *argv[10];
+char **argv;
 char *pInput;
 
 /* your code here */
 int read(int fd, void *ptr, int len)
 {
-	int ret = FUNCTION_FAILURE;
-	int readLength = 0;
-	char *cPtr = (char*) ptr;
-	char c;
 
-	// with length of 0 returns zero and has no other effects
-	if(len > 0) {
-			// Read input character one at a time until the given length.
-			do {
-					syscall(__NR_read, fd, &c, 1);
-					cPtr[readLength++] = c;
-					ret = readLength;
-			} while (c != '\n' && c != EOF && readLength < len);
-			cPtr[readLength] = '\0';    // NULL terminate
-	}
-	else {
-			ret = 0;
-	}
-	return ret;
+	 return syscall(__NR_read, fd, ptr, len);
+
+
 }
 
 int write(int fd, void *ptr, int len)
 {
-	int ret = FUNCTION_FAILURE;
-	int writtenLength = 0;
-	char *cPtr = (char*) ptr;
-	char c = *(char*) ptr;
 
-	// with length of 0 returns zero and has no other effects
-	if(len > 0) {
-			// Read input characters until EOF and newline character is found.
-			while (c != NULL && writtenLength < len) {
-					syscall(__NR_write, fd, &c, 1);
-					ret = ++writtenLength;
-					c = *(++cPtr);
-			}
-	}
-	else {
-			ret = 0;
-	}
-	return ret;
+
+		return syscall(__NR_write, fd, ptr, len);
 }
 
 void exit(int err)
@@ -146,14 +116,15 @@ int munmap(void *addr, int len){
 
 void do_readline(char *buf, int len){
   int i = 0;
-  for(i=0; i < len; i++) {
+  while(i < len) {
       // Read input character one at a time until EOF and newline character is found with NULL termination.
       //ret = read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
-      read(STDIN_FILE_DESCRIPTOR_NUMBER, buf+1, 1);
+      read(STDIN_FILE_DESCRIPTOR_NUMBER, buf+i, 1);
       if(buf[i] == '\n'){
         break;
       }
-      buf[i+1] = '\0';
+      
+      i++;
   }
 
 }
@@ -194,7 +165,10 @@ int split(char **argv, int max_argc, char *line)
 	return i;
 }
 char *do_getarg(int i){
-	int argc = split(argv,10,pInput);
+
+  char* argv_buf[10] = {0};
+	int argc = split(argv_buf,10,pInput);
+  argv = argv_buf;
 	if(i >= argc){
 		return 0;
 	}
@@ -244,7 +218,7 @@ void Load_Execute_Program(){
 do_print("Defining void function\n");
 void (*f)();
 f = hdr.e_entry + M_offset;
-do_print("error here at line 275\n");
+
 f(); //call the first instruction to execute
 do_print("f called\n");
 
@@ -279,7 +253,9 @@ void Enter_File_Name(char *wait){
         else if(!check){
           do_print("> ");
           pInput = &input[0];
+
           do_readline(pInput,MAX_BUFFER_SIZE);
+
 					int count = 0;
 					int match = 1;
 
