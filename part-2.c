@@ -145,20 +145,26 @@ int munmap(void *addr, int len){
 
 
 void do_readline(char *buf, int len){
-  //int ret = FUNCTION_FAILURE;
-  if (buf != NULL) {
+  int i = 0;
+  for(i=0; i < len; i++) {
       // Read input character one at a time until EOF and newline character is found with NULL termination.
       //ret = read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
-      read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
+      read(STDIN_FILE_DESCRIPTOR_NUMBER, buf+1, 1);
+      if(buf[i] == '\n'){
+        break;
+      }
+      buf[i+1] = '\0';
   }
-  //return ret;
+
 }
 
 void do_print(char *buf){
 	//int ret = FUNCTION_FAILURE;
-	if (buf != NULL) {
+  int i = 0;
+	while (buf[i] != '\0') {
 			// Read input characters until EOF and newline character is found.
-			write(STDOUT_FILE_DESCRIPTOR_NUMBER, buf, MAX_BUFFER_SIZE);
+			write(STDOUT_FILE_DESCRIPTOR_NUMBER, buf+i, 1);
+      i++;
 	}
 	//return ret;
 }
@@ -207,13 +213,13 @@ void Load_Execute_Program(){
 
   /* read the main header (offset 0) */
   struct elf64_ehdr hdr;
-  read(fd, &hdr, sizeof(hdr));
+  read(fd, &hdr, (int) sizeof(hdr));
 
   /* read program headers (offset 'hdr.e_phoff') */
   int i, n = hdr.e_phnum;
   struct elf64_phdr phdrs[n];
-  lseek(fd, hdr.e_phoff, SEEK_SET);
-  read(fd, phdrs, sizeof(phdrs));
+  lseek(fd, (int) hdr.e_phoff, SEEK_SET);
+  read(fd, phdrs,(int) sizeof(phdrs));
   char *buf[n];
   int M_offset = 128*4096;
   int len[n];
@@ -225,14 +231,14 @@ void Load_Execute_Program(){
 
         long addrp = ROUND_DOWN((long) phdrs[i].p_vaddr, 4096);
         long addr = addrp + M_offset;
-        buf[i] = mmap((void*)addr, len[i], PROT_READ | PROT_WRITE |
+        buf[i] = mmap((void*)addr,len[i], PROT_READ | PROT_WRITE |
                          PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         if (buf[i] == MAP_FAILED) {
             exit(EXIT_FAILURE);
         }
 
-        lseek(fd, phdrs[i].p_offset, SEEK_SET);
-        read(fd,addr, phdrs[i].p_filesz);
+        lseek(fd, (int) phdrs[i].p_offset, SEEK_SET);
+        read(fd,addr, (int) phdrs[i].p_filesz);
     }
 }
 do_print("Defining void function\n");
@@ -273,7 +279,7 @@ void Enter_File_Name(char *wait){
         else if(!check){
           do_print("> ");
           pInput = &input[0];
-          do_readline(pInput,0);
+          do_readline(pInput,MAX_BUFFER_SIZE);
 					int count = 0;
 					int match = 1;
 
