@@ -157,7 +157,7 @@ void do_readline(char *buf, int len)
     readline(buf, len);
 }
 
-int print(char *buf){
+void print(char *buf){
 	if (buf != NULL) {
 			write(STDOUT_FILE_DESCRIPTOR_NUMBER, buf, MAX_BUFFER_SIZE);
 	}
