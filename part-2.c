@@ -63,10 +63,17 @@ char *do_getarg(int i);
  /* function exit code definitions */
  #define FUNCTION_SUCCESS 0
  #define FUNCTION_FAILURE -1
+ #define M_OFFSET    0x1000000
 
 /* Global  variables for do_getarg */
-char **argv;
+char *argv[10];
+int argc;
 char *pInput;
+
+typedef struct {    
+    void *addr;
+    int len;
+} memory_t;
 
 /* your code here */
 int read(int fd, void *ptr, int len)
@@ -79,9 +86,24 @@ int read(int fd, void *ptr, int len)
 
 int write(int fd, void *ptr, int len)
 {
+	int ret = FUNCTION_FAILURE;
+    int writtenLength = 0;
+    char *cPtr = (char*) ptr;
+    char c = *(char*) ptr;
 
-
-		return syscall(__NR_write, fd, ptr, len);
+    // with length of 0 returns zero and has no other effects
+    if (len > 0) {
+        // Read input characters until EOF and newline character is found.
+        while (c != NULL && writtenLength < len) {
+            syscall(__NR_write, fd, &c, 1);
+            ret = ++writtenLength;
+            c = *(++cPtr);
+        }
+    }
+    else {
+        ret = 0;
+    }
+    return ret;
 }
 
 void exit(int err)
@@ -114,31 +136,39 @@ int munmap(void *addr, int len){
 }
 
 
-void do_readline(char *buf, int len){
-  int i = 0;
-  while(i < len) {
-      // Read input character one at a time until EOF and newline character is found with NULL termination.
-      //ret = read(STDIN_FILE_DESCRIPTOR_NUMBER, pInput, MAX_BUFFER_SIZE);
-      read(STDIN_FILE_DESCRIPTOR_NUMBER, buf+i, 1);
-      if(buf[i] == '\n'){
-        break;
-      }
-      
-      i++;
-  }
-
+int readline(char *buf, int len) {
+  int ret = FUNCTION_FAILURE;
+  int readLength = 0;
+  char *cPtr = pInput;
+  char c;
+  if(i > len) {
+      do {
+            syscall(__NR_read, STDIN_FILE_DESCRIPTOR_NUMBER, &c, 1);
+            cPtr[readLength++] = c;
+        } while (c != '\n' && c != EOF && readLength < len);
+        cPtr[readLength] = '\0';  // NULL terminate
+        ret = readLength;
+    }
+	return ret;
 }
 
-void do_print(char *buf){
-	//int ret = FUNCTION_FAILURE;
-  int i = 0;
-	while (buf[i] != '\0') {
-			// Read input characters until EOF and newline character is found.
-			write(STDOUT_FILE_DESCRIPTOR_NUMBER, buf+i, 1);
-      i++;
+void do_readline(char *buf, int len)
+{
+    readline(buf, len);
+}
+
+int print(char *buf){
+	if (buf != NULL) {
+			write(STDOUT_FILE_DESCRIPTOR_NUMBER, buf, MAX_BUFFER_SIZE);
 	}
-	//return ret;
 }
+
+void do_print(char *buf)
+{
+    print(buf);
+}
+
+
 /* ---------- */
 
 /* simple function to split a line:
@@ -164,134 +194,151 @@ int split(char **argv, int max_argc, char *line)
 	}
 	return i;
 }
-char *do_getarg(int i){
 
-  char* argv_buf[10] = {0};
-	int argc = split(argv_buf,10,pInput);
-  argv = argv_buf;
+char *do_getarg(int i){
 	if(i >= argc){
 		return 0;
 	}
 	return argv[i];
 }
-void Load_Execute_Program(){
-  int exit_code = EXIT_FAILURE;
-  char *filename = do_getarg(0);	/* I should really check argc first... */
-  do_print(filename);
-  int fd = open(filename, O_RDONLY);
-  if( fd < 0){
-    exit_code = ERROR_NULL_POINTER;
-    exit(exit_code);
-  }
-  // fd point to executable file now
 
-  /* read the main header (offset 0) */
-  struct elf64_ehdr hdr;
-  read(fd, &hdr, (int) sizeof(hdr));
+void load_program(int fd, int offset, memory_t *mapped_addrs, int *loaded_len)
+{
+    /* read the main header (offset 0) */
+    struct elf64_ehdr hdr;
+    lseek(fd, 0, SEEK_SET);
+    read(fd, &hdr, sizeof(hdr));
+    int n = hdr.e_phnum;
 
-  /* read program headers (offset 'hdr.e_phoff') */
-  int i, n = hdr.e_phnum;
-  struct elf64_phdr phdrs[n];
-  lseek(fd, (int) hdr.e_phoff, SEEK_SET);
-  read(fd, phdrs,(int) sizeof(phdrs));
-  char *buf[n];
-  int M_offset = 128*4096;
-  int len[n];
+    /* read program headers (offset 'hdr.e_phoff') */
+    struct elf64_phdr phdrs[n];
+    lseek(fd, (int) hdr.e_phoff, SEEK_SET);
+    read(fd, phdrs,(int) sizeof(phdrs));
 
-  /* look at each section in program headers */
-  for (i = 0; i < n; i++) {
-    if (phdrs[i].p_type == PT_LOAD) {
-      len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
+    void *start_addr = (void *)0x0 + offset;
+    int len[n];
+    /* look at each section in program headers */
+    int i;
+    for (i = 0; i < n; i++) {
+        if (phdrs[i].p_type == PT_LOAD) {
+            // int mem_needed_sz = phdrs[i].p_memsz;
+            len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
 
-        long addrp = ROUND_DOWN((long) phdrs[i].p_vaddr, 4096);
-        long addr = addrp + M_offset;
-        buf[i] = mmap((void*)addr,len[i], PROT_READ | PROT_WRITE |
-                         PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if (buf[i] == MAP_FAILED) {
-            exit(EXIT_FAILURE);
+            void *buf = mmap(start_addr,len[i],
+                             PROT_READ | PROT_WRITE | PROT_EXEC,
+                             MAP_PRIVATE | MAP_ANONYMOUS, fd, 0);
+            if (buf == MAP_FAILED) {
+                do_print("mmap failed\n");
+                remove_mapping(mapped_addrs, *loaded_len);
+                exit(EXIT_FAILURE);
+            }
+
+            memory_t memory = {.addr = buf, .len =len[i]};
+            mapped_addrs[*loaded_len] = memory;
+            (*loaded_len)++;
+            start_addr +=len[i];
+
+            lseek(fd, (int)phdrs[i].p_offset, SEEK_SET);
+            read(fd, buf, phdrs[i].p_memsz);
         }
-
-        lseek(fd, (int) phdrs[i].p_offset, SEEK_SET);
-        read(fd,addr, (int) phdrs[i].p_filesz);
     }
 }
-do_print("Defining void function\n");
-void (*f)();
-f = hdr.e_entry + M_offset;
 
-f(); //call the first instruction to execute
-do_print("f called\n");
-
-// free the memory allocate from mmap
-for (i = 0; i < hdr.e_phnum; i++) {
-if (phdrs[i].p_type == PT_LOAD) {
-  len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
-  do_print("FREEING MEMORY\n");
-    munmap(buf[i], len[i]);
+void exec_program(void *entry, int offset) {
+    void (*f)();
+    f = entry + offset;
+    f();
 }
 
+void remove_mapping(memory_t *mapped_addrs, int mapped_len) {
+    int i;
+    for (i = 0; i < mapped_len; i++) {
+        memory_t mem = mapped_addrs[i];
+        munmap(mem.addr, mem.len);
+    }
 }
-do_print("Memory is now Free, closing fd\n");
-close(fd);
+
+void run_program(int fd) {
+    /* Get total entry numbers for mapped address allocation. */
+    struct elf64_ehdr hdr;
+    lseek(fd, 0, SEEK_SET);
+    read(fd, &hdr, sizeof(hdr));
+    int n = hdr.e_phnum;
+
+    /* Hold mmap mapped address for future removal. */
+    memory_t mapped_addrs[n];
+
+    int loaded_len = 0;
+
+    load_program(fd, M_OFFSET, mapped_addrs, &loaded_len);
+
+    exec_program(hdr.e_entry, M_OFFSET);
+
+    remove_mapping(mapped_addrs, loaded_len);
 }
-void Enter_File_Name(char *wait){
-  pInput = &wait[0];
+
+int compare_string(char *str1, char*str2, int length)
+{
+    int count = 0;
+    int match = 1;
+
+    while ((*(str1 + count) != NULL) && (count < length)) {
+        if (*(str1 + count) != *(str2 + count)) {
+            match = 0;
+            break;
+        }
+        count++;
+    }
+    return match;
+}
+
+void Enter_File_Name(){
   char input[MAX_BUFFER_SIZE] = {0};
-	char quit[5] = {'q', 'u', 'i', 't', '\n'};
-	char *pQuit = &quit[0];
-	int exit_code = EXIT_FAILURE;
-  int check = 1; // checks used to switch from wait input to user input
+  char *pInput = &input[0];
+  char quit[5] = {'q', 'u', 'i', 't', '\n'};
+  char *pQuit = &quit[0];
+  int exit_code = EXIT_FAILURE;
 
-  if(pInput != NULL) {    // NULL check, if in case malloc is used in future
 
-			while(1) {
 
-        // readline(pInput);
-        if(check){
-          check = 0;
-        }
-        else if(!check){
-          do_print("> ");
-          pInput = &input[0];
+  while (1) {
+      do_print("> ");
+      readline(pInput, MAX_BUFFER_SIZE);
 
-          do_readline(pInput,MAX_BUFFER_SIZE);
+      if (compare_string(pInput, pQuit, 5)) {
+          exit_code = EXIT_SUCCESS;
+          break;
+      }
 
-					int count = 0;
-					int match = 1;
+      argc = split(argv, 10, pInput);
 
-					while(*(pInput + count) != NULL) {
-							if(*(pInput + count) != *(pQuit + count)) {
-									match = 0;
-									break;
-							}
-							count++;
-					}
+      int index = 0;
+      char *arg = do_getarg(index);
+      // if (arg == NULL) {
+      //     do_print("Invalid get arguments index. continue !!!\n");
+      //     continue;
+      // }
 
-					if(match) {
-							exit_code = EXIT_SUCCESS;
-							break;
-					}
-        }
-        Load_Execute_Program();
-	}
-  }
-  else {
-      exit_code = ERROR_NULL_POINTER;
+      int fd = open(arg, O_RDONLY);
+      // if (fd < 0) {
+      //     do_print("Selected micro program doesn't exist\n");
+      //     continue;
+      // }
+
+      run_program(fd);
+      close(fd);
   }
 
   exit(exit_code);
 
 }
 
-/* ---------- */
-
 void main(void)
 {
-	vector[0] = do_readline;
-	vector[1] = do_print;
-	vector[2] = do_getarg;
+    vector[0] = do_readline;
+    vector[1] = do_print;
+    vector[2] = do_getarg;
 
-	/* YOUR CODE HERE */
-  Enter_File_Name("wait");
+    Enter_File_Name();
 
-}
+  }
