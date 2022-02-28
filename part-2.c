@@ -314,16 +314,7 @@ void Enter_File_Name(){
 
       int index = 0;
       char *arg = do_getarg(index);
-      // if (arg == NULL) {
-      //     do_print("Invalid get arguments index. continue !!!\n");
-      //     continue;
-      // }
-
       int fd = open(arg, O_RDONLY);
-      // if (fd < 0) {
-      //     do_print("Selected micro program doesn't exist\n");
-      //     continue;
-      // }
 
       run_program(fd);
       close(fd);
