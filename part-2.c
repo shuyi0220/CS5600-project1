@@ -68,7 +68,7 @@ char *do_getarg(int i);
 /* Global  variables for do_getarg */
 char *argv[10];
 int argc;
-char *pInput;
+
 
 typedef struct {    
     void *addr;
@@ -78,10 +78,7 @@ typedef struct {
 /* your code here */
 int read(int fd, void *ptr, int len)
 {
-
-	 return syscall(__NR_read, fd, ptr, len);
-
-
+	return syscall(__NR_read, fd, ptr, len);
 }
 
 int write(int fd, void *ptr, int len)
@@ -108,12 +105,11 @@ int write(int fd, void *ptr, int len)
 
 void exit(int err)
 {
-    syscall(__NR_exit, err);
+	syscall(__NR_exit, err);
 }
 
-int open(char *path, int flags){
-
-
+int open(char *path, int flags)
+{
 	return syscall(__NR_open, path, flags);
 
 
@@ -139,14 +135,14 @@ int munmap(void *addr, int len){
 int readline(char *buf, int len) {
   int ret = FUNCTION_FAILURE;
   int readLength = 0;
-  char *cPtr = pInput;
+  char *cPtr = buf;
   char c;
   if(i > len) {
       do {
             syscall(__NR_read, STDIN_FILE_DESCRIPTOR_NUMBER, &c, 1);
             cPtr[readLength++] = c;
         } while (c != '\n' && c != EOF && readLength < len);
-        cPtr[readLength] = '\0';  // NULL terminate
+        cPtr[readLength] = '\0';
         ret = readLength;
     }
 	return ret;
@@ -229,7 +225,6 @@ void load_program(int fd, int offset, memory_t *mapped_addrs, int *loaded_len)
                              MAP_PRIVATE | MAP_ANONYMOUS, fd, 0);
             if (buf == MAP_FAILED) {
                 do_print("mmap failed\n");
-                remove_mapping(mapped_addrs, *loaded_len);
                 exit(EXIT_FAILURE);
             }
 
