@@ -137,7 +137,7 @@ int readline(char *buf, int len) {
   int readLength = 0;
   char *cPtr = buf;
   char c;
-  if(i > len) {
+  if(len > 0) {
       do {
             syscall(__NR_read, STDIN_FILE_DESCRIPTOR_NUMBER, &c, 1);
             cPtr[readLength++] = c;
