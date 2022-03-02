@@ -38,6 +38,38 @@ void do_uexit(void);
 
 /* ---------- */
 
+void yield12(void)
+{
+    switch_to(&pStack1, pStack2); 
+}
+
+void do_yield12(void)
+{
+    yield12();
+}
+
+void yield21(void)
+{
+    switch_to(&pStack2, pStack1); 
+}
+
+void do_yield21(void)
+{
+    yield21();
+}
+
+void uexit(void)
+{
+    switch_to(&pStack1, pMainStack); 
+}
+
+void do_uexit(void)
+{
+    uexit();
+}
+
+
+
 void main(void)
 {
 	vector[1] = do_print;
