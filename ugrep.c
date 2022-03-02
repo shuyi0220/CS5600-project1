@@ -36,6 +36,9 @@ int main(void)
 	char buf[128];
 	char *pattern = getarg(1);
 
+
+	//print(pattern);
+
 	if (pattern == 0 || getarg(2) != 0) {
 		print("usage: uprog <pattern>\n");
 		return 0;
@@ -54,4 +57,3 @@ int main(void)
 	}
 	return 0;
 }
-

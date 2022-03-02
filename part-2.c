@@ -65,8 +65,12 @@ char *do_getarg(int i);
  #define FUNCTION_FAILURE -1
 
 /* Global  variables for do_getarg */
-char **argv;
+char *argv[10] = {0};
+//char **argv;
+
+int argc;
 char *pInput;
+//char pInput[MAX_BUFFER_SIZE+1];
 
 /* your code here */
 int read(int fd, void *ptr, int len)
@@ -79,8 +83,6 @@ int read(int fd, void *ptr, int len)
 
 int write(int fd, void *ptr, int len)
 {
-
-
 		return syscall(__NR_write, fd, ptr, len);
 }
 
@@ -114,6 +116,7 @@ int munmap(void *addr, int len){
 }
 
 
+
 void do_readline(char *buf, int len){
   int i = 0;
   while(i < len) {
@@ -123,7 +126,6 @@ void do_readline(char *buf, int len){
       if(buf[i] == '\n'){
         break;
       }
-      
       i++;
   }
 
@@ -148,7 +150,7 @@ void do_print(char *buf){
  *   int argc = split(argv, 10, buffer);
  *   ... pointers to words are in argv[0], ... argv[argc-1]
  */
-int split(char **argv, int max_argc, char *line)
+int split(char **argvs, int max_argc, char *line)
 {
 	int i = 0;
 	char *p = line;
@@ -158,7 +160,7 @@ int split(char **argv, int max_argc, char *line)
 			*p++ = 0;
 		if (*p == 0)
 			return i;
-		argv[i++] = p;
+		argvs[i++] = p;
 		while (*p != 0 && *p != ' ' && *p != '\t' && *p != '\n')
 			p++;
 	}
@@ -166,25 +168,37 @@ int split(char **argv, int max_argc, char *line)
 }
 char *do_getarg(int i){
 
-  char* argv_buf[10] = {0};
-	int argc = split(argv_buf,10,pInput);
-  argv = argv_buf;
-	if(i >= argc){
-		return 0;
-	}
+  if(i == 0){
+     char* argv_buf[10] = {0};
+	   argc = split(argv_buf,10,pInput);
+     do_print("argc");
+     do_print("\n");
+     //do_print(argc);
+     //argv = argv_buf;
+     int j;
+     for( j = 0; j < argc; j++){
+       argv[j] = (char*)argv_buf[j];
+     }
+
+     do_print(argv[0]);
+     do_print("\n");
+     if(argc > 1 ){
+       do_print(argv[1]);
+       do_print("\n");
+     }
+     //argv = argv_buf;
+     if((i > argc)){
+       do_print("error\n");
+
+       return 0;
+     }
+     //argv = argv_buf;
+   }
+   do_print("successful\n");
+   
 	return argv[i];
 }
-void Load_Execute_Program(){
-  int exit_code = EXIT_FAILURE;
-  char *filename = do_getarg(0);	/* I should really check argc first... */
-  do_print(filename);
-  int fd = open(filename, O_RDONLY);
-  if( fd < 0){
-    exit_code = ERROR_NULL_POINTER;
-    exit(exit_code);
-  }
-  // fd point to executable file now
-
+void Load_Execute_Program(int fd){
   /* read the main header (offset 0) */
   struct elf64_ehdr hdr;
   read(fd, &hdr, (int) sizeof(hdr));
@@ -211,46 +225,47 @@ void Load_Execute_Program(){
             exit(EXIT_FAILURE);
         }
 
-        lseek(fd, (int) phdrs[i].p_offset, SEEK_SET);
-        read(fd,addr, (int) phdrs[i].p_filesz);
+        lseek(fd,(int) phdrs[i].p_offset, SEEK_SET);
+        read(fd,(void*)addr,(int) phdrs[i].p_filesz);
     }
 }
-do_print("Defining void function\n");
 void (*f)();
 f = hdr.e_entry + M_offset;
 
 f(); //call the first instruction to execute
-do_print("f called\n");
 
 // free the memory allocate from mmap
 for (i = 0; i < hdr.e_phnum; i++) {
 if (phdrs[i].p_type == PT_LOAD) {
   len[i] = ROUND_UP(phdrs[i].p_memsz, 4096);
-  do_print("FREEING MEMORY\n");
     munmap(buf[i], len[i]);
 }
 
 }
-do_print("Memory is now Free, closing fd\n");
 close(fd);
 }
-void Enter_File_Name(char *wait){
-  pInput = &wait[0];
+
+/* ---------- */
+
+void main(void)
+{
+	vector[0] = do_readline;
+	vector[1] = do_print;
+	vector[2] = do_getarg;
+
+	/* YOUR CODE HERE */
   char input[MAX_BUFFER_SIZE] = {0};
+  pInput = input;
 	char quit[5] = {'q', 'u', 'i', 't', '\n'};
 	char *pQuit = &quit[0];
 	int exit_code = EXIT_FAILURE;
-  int check = 1; // checks used to switch from wait input to user input
+  //int check = 1; // checks used to switch from wait input to user input
 
   if(pInput != NULL) {    // NULL check, if in case malloc is used in future
 
 			while(1) {
 
         // readline(pInput);
-        if(check){
-          check = 0;
-        }
-        else if(!check){
           do_print("> ");
           pInput = &input[0];
 
@@ -271,8 +286,14 @@ void Enter_File_Name(char *wait){
 							exit_code = EXIT_SUCCESS;
 							break;
 					}
-        }
-        Load_Execute_Program();
+          char *filename = do_getarg(0);	/* I should really check argc first... */
+          int fd = open(filename, O_RDONLY);
+          if( fd < 0){
+            exit_code = ERROR_NULL_POINTER;
+            exit(exit_code);
+          }
+          // fd point to executable file now
+        Load_Execute_Program(fd);
 	}
   }
   else {
@@ -281,17 +302,5 @@ void Enter_File_Name(char *wait){
 
   exit(exit_code);
 
-}
-
-/* ---------- */
-
-void main(void)
-{
-	vector[0] = do_readline;
-	vector[1] = do_print;
-	vector[2] = do_getarg;
-
-	/* YOUR CODE HERE */
-  Enter_File_Name("wait");
 
 }
