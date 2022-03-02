@@ -24,7 +24,7 @@
 /* function exit code definitions */
 #define FUNCTION_SUCCESS 0
 #define FUNCTION_FAILURE -1
-#define M_OFFSET    0x1000000
+#define M1_OFFSET    0x1000000
 #define M2_OFFSET    0x2000000
 
 /* Type definitions */
